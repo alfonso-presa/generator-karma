@@ -50,24 +50,18 @@ describe('Karma generator creation test', function () {
     });
 
     describe('stdout ward', function () {
-      var logMessage;
-      var stderrWriteBackup = process.stderr.write;
-
-      beforeEach(function () {
-        logMessage = '';
-        process.stderr.write = (function () {
-          return function (str) {
-            logMessage += str;
-          };
-        }(process.stderr.write));
-      });
-
-      afterEach(function () {
-        process.stderr.write = stderrWriteBackup;
-      });
-
       it('creates a travis file but warns about missing package.json', function(done) {
-        gen.withOptions({travis: true}).on('end', function () {
+        var logMessage = '';
+        gen.withOptions({travis: true})
+        .on('ready', function() {
+          gen.generator.log.__olderror = gen.generator.log.error;
+          gen.generator.log.error = function(){
+            logMessage += arguments[0];
+            gen.generator.log.__olderror.apply(gen.generator.log, arguments);
+          };
+        })
+        .on('end', function () {
+          gen.generator.log.error = gen.generator.log.__olderror;
           assert.file(['.travis.yml']);
           assert(
             logMessage.indexOf('Could not open package.json for reading.') > -1
@@ -75,31 +69,34 @@ describe('Karma generator creation test', function () {
           done();
         });
       });
-
     });
   });
 
   it('creates a travis file and updates package.json', function(done) {
-    helpers.testDirectory(join('test', 'temp'), function () {
-      var gen = helpers.run(join(__dirname, '../app'));
-      require('fs').writeFileSync('package.json', '{}');
-      gen.withOptions({travis: true}).on('end', function () {
-        assert.file(['.travis.yml']);
-        assert.fileContent('package.json', /grunt test/);
-        done();
-      });
+    helpers
+    .run(join(__dirname, '../app'))
+    .withOptions({travis: true, force: true})
+    .inDir(join(__dirname, 'temp'), function(dir){
+      require('fs').writeFileSync(join(dir,'package.json'), '{}');
+    })
+    .on('end', function () {
+      assert.file(['.travis.yml']);
+      assert.fileContent('package.json', /grunt test/);
+      done();
     });
   });
 
   it('updates package.json with karma dependencies', function(done) {
-    helpers.testDirectory(join('test', 'temp'), function () {
-      var gen = helpers.run(join(__dirname, '../app'));
-      require('fs').writeFileSync('package.json', '{"dependencies":{"grunt":"1.0.0"}}');
-      gen.withOptions({travis: true}).on('end', function () {
-        assert.fileContent('package.json', /karma/);
-        assert.fileContent('package.json', /grunt/);
-        done();
-      });
+    helpers
+    .run(join(__dirname, '../app'))
+    .withOptions({travis: true, force: true})
+    .inDir(join(__dirname, 'temp'), function(dir){
+      require('fs').writeFileSync(join(dir,'package.json'), '{"dependencies":{"grunt":"1.0.0"}}');
+    })
+    .on('end', function () {
+      assert.fileContent('package.json', /karma/);
+      assert.fileContent('package.json', /grunt/);
+      done();
     });
   });
 });

@@ -199,36 +199,19 @@ module.exports = yeoman.generators.Base.extend({
       this.options.plugins.push('coffee-script');
     }
 
-    var done = this.async();
-    var packageJson = path.join(
-      this.options.cwd || process.cwd(),
-      'package.json'
-    );
+    var data = this.fs.readJSON(this.destinationPath('package.json'));
+    if(!data) {
+      this.log.error('Could not open package.json for reading.');
+      return;
+    }
 
-    fs.readFile(packageJson, { encoding: 'utf-8' }, function (err, content) {
-      var data;
-      if (err) {
-        this.log.error('Could not open package.json for reading.', err);
-        done();
-        return;
-      }
-
-      try {
-        data = JSON.parse(content);
-      } catch (err) {
-        this.log.error('Could not parse package.json.', err);
-        done();
-        return;
-      }
-
-      data.devDependencies = data.devDependencies || {};
+    data.devDependencies = data.devDependencies || {};
       this.options.plugins.forEach(function (plugin) {
         data.devDependencies[plugin] = '*';
       })
       data.devDependencies = sortedObject(data.devDependencies);
 
-      fs.writeFile(packageJson, JSON.stringify(data, null, 2), done);
-    }.bind(this));
+    this.fs.writeJSON(this.destinationPath('package.json'), data);
   },
 
   writeGruntFile: function () {
@@ -264,41 +247,21 @@ module.exports = yeoman.generators.Base.extend({
 
     this.copy('travis.yml', '.travis.yml');
 
-    var done = this.async();
-    var packageJson = path.join(
-      this.options.cwd || process.cwd(),
-      'package.json'
-    );
+    var data = this.fs.readJSON(this.destinationPath('package.json'));
 
-    fs.readFile(packageJson, { encoding: 'utf-8' }, function (err, content) {
-      var data;
-      if (err) {
-        this.log.error('Could not open package.json for reading.', err);
-        done();
-        return;
-      }
+    if(!data) {
+      this.log.error('Could not open package.json for reading.', {});
+      return;
+    }
 
-      try {
-        data = JSON.parse(content);
-      } catch (err) {
-        this.log.error('Could not parse package.json.', err);
-        done();
-        return;
-      }
-
-      if (data.scripts && data.scripts.test) {
-        this.log.writeln(
-          'Test script already present in package.json. Skipping rewriting.'
-        );
-        done();
-        return;
-      }
-
+    if (data.scripts && data.scripts.test) {
+      this.log.writeln('Test script already present in package.json. Skipping rewriting.');
+    }
+    else{
       data.scripts = data.scripts || {};
       data.scripts.test = 'grunt test';
-
-      fs.writeFile(packageJson, JSON.stringify(data, null, 2), done);
-    }.bind(this));
+      this.fs.writeJSON(this.destinationPath('package.json'), data);
+    }
   },
 
   installDeps: function () {
