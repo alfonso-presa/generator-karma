@@ -2,13 +2,12 @@
 
 var yeoman = require('yeoman-generator');
 var path = require('path');
-var fs = require('fs');
-var sortedObject = require("sorted-object");
+var sortedObject = require('sorted-object');
 
 var _ = require('underscore');
 
 module.exports = yeoman.generators.Base.extend({
-  init: function () {
+  initializing: function () {
     var notEmpty = function (str) {
       return str.split(',').filter(function (check) {
         return check && check !== '';
@@ -166,105 +165,108 @@ module.exports = yeoman.generators.Base.extend({
     }
   },
 
-  makeConfig: function () {
-    this.sourceRoot(path.join(__dirname, this.options['template-path']));
+  writing: {
+    makeConfig: function () {
+      this.sourceRoot(path.join(__dirname, this.options['template-path']));
 
-    this.templateArray = function (files, comments, coffee) {
-      var str = [];
-      _.each(comments, function (comment) {
-        str.push('\n      ' + (coffee ? '# ' : '// ') + comment);
-      });
-      _.uniq(files).forEach(function (item, index) {
-        str.push('\n      \'' + item + '\'');
-        if (index + 1 !== files.length) {
-          if (!coffee) {
-            str.push(',');
+      this.templateArray = function (files, comments, coffee) {
+        var str = [];
+        _.each(comments, function (comment) {
+          str.push('\n      ' + (coffee ? '# ' : '// ') + comment);
+        });
+        _.uniq(files).forEach(function (item, index) {
+          str.push('\n      \'' + item + '\'');
+          if (index + 1 !== files.length) {
+            if (!coffee) {
+              str.push(',');
+            }
           }
-        }
-      });
-      str.push('\n    ');
-      return str.join('');
-    };
+        });
+        str.push('\n    ');
+        return str.join('');
+      };
 
-    this.template(
-      this.options['config-file'],
-      path.join(this.options['config-path'], this.options['config-file'])
-    );
-  },
+      this.fs.copyTpl(
+        this.templatePath(this.options['config-file']),
+        this.destinationPath(path.join(this.options['config-path'], this.options['config-file'])),
+        this
+      );
+    },
 
-  writeDependencies: function() {
+    writeDependencies: function() {
 
-    this.options.plugins.push('grunt-karma');
-    if (this.options.coffee) {
-      this.options.plugins.push('coffee-script');
-    }
+      this.options.plugins.push('grunt-karma');
+      if (this.options.coffee) {
+        this.options.plugins.push('coffee-script');
+      }
 
-    var data = this.fs.readJSON(this.destinationPath('package.json'));
-    if(!data) {
-      this.log.error('Could not open package.json for reading.');
-      return;
-    }
+      var data = this.fs.readJSON(this.destinationPath('package.json'));
+      if(!data) {
+        this.log.error('Could not open package.json for reading.');
+        return;
+      }
 
-    data.devDependencies = data.devDependencies || {};
-      this.options.plugins.forEach(function (plugin) {
-        data.devDependencies[plugin] = '*';
-      })
-      data.devDependencies = sortedObject(data.devDependencies);
+      data.devDependencies = data.devDependencies || {};
+        this.options.plugins.forEach(function (plugin) {
+          data.devDependencies[plugin] = '*';
+        });
+        data.devDependencies = sortedObject(data.devDependencies);
 
-    this.fs.writeJSON(this.destinationPath('package.json'), data);
-  },
-
-  writeGruntFile: function () {
-    if (!this.options['gruntfile-path']) {
-      return;
-    }
-
-    this.gruntfile.loadNpmTasks('grunt-karma');
-    this.gruntfile.insertConfig(
-      'karma',
-      JSON.stringify({
-        unit: {
-          options: {
-            'autoWatch': false,
-            'browsers': this.options.browsers,
-            'configFile': [
-              this.options['config-path'],
-              '/',
-              this.options['config-file']
-            ].join(''),
-            'singleRun': true
-          }
-        }
-      })
-    );
-    this.gruntfile.registerTask('test', ['karma']);
-  },
-
-  setupTravis: function () {
-    if (!this.options.travis) {
-      return;
-    }
-
-    this.copy('travis.yml', '.travis.yml');
-
-    var data = this.fs.readJSON(this.destinationPath('package.json'));
-
-    if(!data) {
-      this.log.error('Could not open package.json for reading.', {});
-      return;
-    }
-
-    if (data.scripts && data.scripts.test) {
-      this.log.writeln('Test script already present in package.json. Skipping rewriting.');
-    }
-    else{
-      data.scripts = data.scripts || {};
-      data.scripts.test = 'grunt test';
       this.fs.writeJSON(this.destinationPath('package.json'), data);
+    },
+
+    writeGruntFile: function () {
+      if (!this.options['gruntfile-path']) {
+        return;
+      }
+
+      this.gruntfile.loadNpmTasks('grunt-karma');
+      this.gruntfile.insertConfig(
+        'karma',
+        JSON.stringify({
+          unit: {
+            options: {
+              'autoWatch': false,
+              'browsers': this.options.browsers,
+              'configFile': [
+                this.options['config-path'],
+                '/',
+                this.options['config-file']
+              ].join(''),
+              'singleRun': true
+            }
+          }
+        })
+      );
+      this.gruntfile.registerTask('test', ['karma']);
+    },
+
+    setupTravis: function () {
+      if (!this.options.travis) {
+        return;
+      }
+
+      this.copy('travis.yml', '.travis.yml');
+
+      var data = this.fs.readJSON(this.destinationPath('package.json'));
+
+      if(!data) {
+        this.log.error('Could not open package.json for reading.', {});
+        return;
+      }
+
+      if (data.scripts && data.scripts.test) {
+        this.log.writeln('Test script already present in package.json. Skipping rewriting.');
+      }
+      else{
+        data.scripts = data.scripts || {};
+        data.scripts.test = 'grunt test';
+        this.fs.writeJSON(this.destinationPath('package.json'), data);
+      }
     }
   },
 
-  installDeps: function () {
+  install: function () {
     if (!this.options['skip-install']) {
         this.npmInstall();
     }
